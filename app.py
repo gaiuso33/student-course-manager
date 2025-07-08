@@ -3,6 +3,10 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from forms import StudentForm
 from flask import request, redirect, url_for
+import pandas as pd
+from flask import send_file
+from io import BytesIO
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mysecretkey'
@@ -93,7 +97,30 @@ def list_students():
 
     return render_template('students.html', students=student_data)
 
+@app.route('/export/excel')
+def export_excel():
+    students = Student.query.all()
+    data = []
 
+    for student in students:
+        gpa = calculate_gpa(student.courses)
+        for course in student.courses:
+            data.append({
+                'Name': student.name,
+                'Matric No': student.matric_no,
+                'Course': course.course_name,
+                'Score': course.score,
+                'GPA': gpa
+            })
+
+    df = pd.DataFrame(data)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Student Records')
+    output.seek(0)
+
+    return send_file(output, download_name="student_records.xlsx", as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
