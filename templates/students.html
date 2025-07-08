@@ -2,7 +2,9 @@
 <html>
 <head>
     <title>Student List & GPA</title>
-</head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   </head>
+
 <body>
     <h1>All Students and Their GPA</h1>
     <table border="1" cellpadding="10">
@@ -27,5 +29,36 @@
         </tr>
         {% endfor %}
     </table>
+    <h2>GPA Distribution</h2>
+<canvas id="gpaChart" width="600" height="300"></canvas>
+
+<script>
+    const labels = {{ students | map(attribute='matric') | list | tojson }};
+    const gpaData = {{ students | map(attribute='gpa') | list | tojson }};
+
+    const ctx = document.getElementById('gpaChart').getContext('2d');
+    const gpaChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'GPA',
+                data: gpaData,
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    suggestedMin: 0,
+                    suggestedMax: 4
+                }
+            }
+        }
+    });
+</script>
+
 </body>
 </html>
