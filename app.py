@@ -1,15 +1,18 @@
 from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 import os
-from forms import StudentForm
+from forms import StudentForm, LoginForm
 from flask import request, redirect, url_for
 import pandas as pd
 from flask import send_file
 from io import BytesIO
-
+from flask_login import UserMixin
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mysecretkey'
+
 
 # SQLite DB config
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -31,6 +34,30 @@ class CourseGrade(db.Model):
     course_name = db.Column(db.String(100), nullable=False)
     score = db.Column(db.Float, nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)  # hashed
+    role = db.Column(db.String(10), nullable=False)  # 'admin' or 'student'
+
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+# Create the database tables
+with app.app_context():
+    db.create_all()
+# Create an admin user if it doesn't exist
+with app.app_context():
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', password=generate_password_hash('admin123'), role='admin')
+        db.session.add(admin)
+        db.session.commit()
 
 # ------------------ helper functions ------------------
 
@@ -61,8 +88,29 @@ def calculate_gpa(grades):
 def home():
     return render_template('index.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user and check_password_hash(user.password, form.password.data):
+            login_user(user)
+            return redirect(url_for('home'))
+    return render_template('login.html', form=form)
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+
 @app.route('/add', methods=['GET', 'POST'])
+@login_required
 def add_student():
+    # Optionally restrict to admin only
+    if current_user.role != 'admin':
+        return redirect(url_for('home'))
     form = StudentForm()
     if form.validate_on_submit():
         student = Student.query.filter_by(matric_no=form.matric_no.data).first()
