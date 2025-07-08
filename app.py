@@ -28,6 +28,29 @@ class CourseGrade(db.Model):
     score = db.Column(db.Float, nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
 
+# ------------------ helper functions ------------------
+
+def calculate_gpa(grades):
+    total_points = 0
+    total_courses = len(grades)
+    
+    for grade in grades:
+        score = grade.score
+        # Use your university's grading scale
+        if score >= 70:
+            points = 4.0
+        elif score >= 60:
+            points = 3.0
+        elif score >= 50:
+            points = 2.0
+        elif score >= 45:
+            points = 1.0
+        else:
+            points = 0.0
+        total_points += points
+
+    return round(total_points / total_courses, 2) if total_courses > 0 else 0.0
+
 # ------------------ Routes ------------------
 
 @app.route('/')
@@ -53,6 +76,24 @@ def add_student():
         db.session.commit()
         return redirect(url_for('home'))
     return render_template('add_student.html', form=form)
+
+@app.route('/students')
+def list_students():
+    students = Student.query.all()
+    student_data = []
+
+    for student in students:
+        gpa = calculate_gpa(student.courses)
+        student_data.append({
+            'name': student.name,
+            'matric': student.matric_no,
+            'gpa': gpa,
+            'courses': student.courses
+        })
+
+    return render_template('students.html', students=student_data)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
