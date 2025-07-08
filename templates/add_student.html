@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Student</title>
+</head>
+<body>
+    <h1>Add Student and Course Grade</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <p>{{ form.name.label }} {{ form.name() }}</p>
+        <p>{{ form.matric_no.label }} {{ form.matric_no() }}</p>
+        <p>{{ form.course_name.label }} {{ form.course_name() }}</p>
+        <p>{{ form.score.label }} {{ form.score() }}</p>
+        <p>{{ form.submit() }}</p>
+    </form>
+</body>
+</html>
