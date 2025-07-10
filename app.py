@@ -1,13 +1,10 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, send_file,request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 import os
 from forms import StudentForm, LoginForm
-from flask import request, redirect, url_for
 import pandas as pd
-from flask import send_file
 from io import BytesIO
-from flask_login import UserMixin
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -33,6 +30,7 @@ class CourseGrade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     course_name = db.Column(db.String(100), nullable=False)
     score = db.Column(db.Float, nullable=False)
+    semester = db.Column(db.String(50), nullable=False)  # e.g., "2024/2025 - First"
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
 
 class User(UserMixin, db.Model):
@@ -61,13 +59,14 @@ with app.app_context():
 
 # ------------------ helper functions ------------------
 
-def calculate_gpa(grades):
+def calculate_gpa(courses):
     total_points = 0
-    total_courses = len(grades)
-    
-    for grade in grades:
-        score = grade.score
-        # Use your university's grading scale
+    total_courses = len(courses)
+    if total_courses == 0:
+        return 0.0
+
+    for course in courses:
+        score = course.score
         if score >= 70:
             points = 4.0
         elif score >= 60:
@@ -80,7 +79,7 @@ def calculate_gpa(grades):
             points = 0.0
         total_points += points
 
-    return round(total_points / total_courses, 2) if total_courses > 0 else 0.0
+    return round(total_points / total_courses, 2)
 
 # ------------------ Routes ------------------
 
@@ -122,6 +121,7 @@ def add_student():
         grade = CourseGrade(
             course_name=form.course_name.data,
             score=form.score.data,
+            semester=form.semester.data,
             student_id=student.id
         )
         db.session.add(grade)
@@ -130,16 +130,27 @@ def add_student():
     return render_template('add_student.html', form=form)
 
 @app.route('/students')
+@login_required
 def list_students():
     students = Student.query.all()
     student_data = []
 
     for student in students:
-        gpa = calculate_gpa(student.courses)
+        # Group courses by semester
+        semesters = {}
+        for course in student.courses:
+            semesters.setdefault(course.semester, []).append(course)
+
+        # Calculate GPA per semester
+        semester_gpas = {
+            semester: calculate_gpa(courses)
+            for semester, courses in semesters.items()
+        }
+
         student_data.append({
             'name': student.name,
             'matric': student.matric_no,
-            'gpa': gpa,
+            'semester_gpas': semester_gpas,
             'courses': student.courses
         })
 
